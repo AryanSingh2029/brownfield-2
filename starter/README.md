@@ -1,63 +1,116 @@
 # The Storm Inbox
 
-You’re an engineer at MonsoonSure Insurance. Overnight rain in Bengaluru has left the property claims team with twelve claims and two field adjusters. Divya, the supervisor, uses the existing dashboard to inspect documents and ownership. To decide who takes the next claim, she still keeps a spreadsheet.
+At 9:15 on a rainy Bengaluru morning, Divya has twelve property damage claims on her screen and two field adjusters available. A family in JP Nagar reported a leaking bedroom roof at 8:10. Their claim is missing a photo. Another family in Koramangala reported roof damage at 9:00 and has already sent everything Divya needs.
 
-> “At 8:10 a family called about a roof leak. I’m waiting for their photo. The roof claim that came in at 9:00 is ready now. When the first family sends their photo, remember when they first called.”
+> “I can send someone to Koramangala now. But when the JP Nagar photo comes in, I need to remember that family called first. Right now the only place I track that is my spreadsheet.”
 
-**Your assignment:** Add a dispatch queue to Divya’s existing dashboard. By the end of the session she should be able to pick the next claim, explain its position and assign it to someone with capacity.
+You’re an engineer at **MonsoonSure Insurance**. Divya supervises the claims desk. The family filing a claim is the **claimant**. The **assigned adjuster** is the employee who investigates the damage and follows up with the family. **Your assignment is to add dispatch to the existing claims register** so Divya can see which claim comes next, give it to someone with room, and respond when the morning changes.
 
-## Start your shift
+## Open the dashboard
 
-Open the starter directory in IBM Bob. From that directory, run the following with Node.js 22 or newer. No dependency installation is needed.
+Open the directory containing this README and `package.json` in IBM Bob. From its terminal, run the following with Node.js 22 or newer. The starter uses Node’s standard library.
 
 ```sh
 npm test
 npm start
 ```
 
-Open [the claims register](http://127.0.0.1:7991). Click **CLM-003** to see the missing photo. Filter by **Assigned** and open **CLM-006** to find its owner. Both adjusters have one active claim. Five baseline tests cover the existing register. Keep claim selection, details and status filtering working as you extend it.
+Expect five passing tests. Open the [claims register](http://127.0.0.1:7991) and look at the desk Divya starts with.
 
-## Dispatch rules
-
-1. **Eligibility.** A claim is Ready when it has no owner and all its required documents have arrived. Show incomplete, unassigned claims under **Waiting for documents** and name every missing document. Assigned claims stay with their current owner.
-2. **Priority.** Order Ready claims by severity (High, Standard, Low), then original filing time (oldest first), then ascending claim ID. Show the severity and filing time alongside each ID so Divya can explain the order.
-3. **Assignment.** Divya selects a Ready claim and an available adjuster. Each adjuster can hold two active claims, including existing assignments. All assigned claims in this exercise count as active. On success remove the claim from Ready, show its owner, and update the workload. Keep the accepted state on the server so both tabs read the same desk.
-4. **Stale views.** Recheck eligibility, ownership, availability and capacity on the server when accepting an assignment. If a second request arrives after circumstances have changed, decline it, explain why, and bring that tab up to date. Two near-simultaneous requests for the last slot must result in exactly one assignment.
-5. **Morning update.** Add a **Load storm update** action that applies the two events in the supplied [fixture](fixtures/storm-update.json). At 10:30, the roof photo arrives for CLM-003. At 10:35, Meera becomes unavailable. Keep the original filing time and every existing owner. Label Meera’s assigned claim **Owner unavailable**. Ravi remains available while he has capacity.
-6. **Refresh and replay.** Keep accepted changes across page refreshes. Applying the same update again must produce the same queue, documents, workloads and owners. A single local server process is sufficient. You may use in-memory state for the workshop.
-
-## Show Divya the result
-
-Start this demo with the original twelve claims. Run the update before making any new assignments.
-
-| Action | Expected result |
+| What you see | What it means |
 | --- | --- |
-| Open Ready | Seven claims. CLM-008 and CLM-009 are both High and filed at 09:00. CLM-008 comes first. CLM-002 lists two missing documents. |
-| Load the update | Eight ready. CLM-003 leads because its original filing time is 08:10. Meera remains the owner of CLM-006, now marked Owner unavailable. |
-| From a tab opened before the update, try assigning CLM-008 to Meera | The server declines. CLM-008 stays ready and Meera still has one claim. |
-| Assign CLM-003 to Ravi | Ravi now has two active claims. CLM-008 returns to the top. Nobody can take another assignment until availability or capacity changes. |
-| Refresh and replay | Seven ready, two waiting, three assigned. The photo appears once. CLM-003 still belongs to Ravi and CLM-006 to Meera. |
+| Meera Rao and Ravi Kumar each show **1 of 2 active claims** | Each adjuster is already handling one family’s claim and can take one more. |
+| **Assigned** shows 2 claims | Open CLM-006 to see Meera listed as the assigned adjuster. Ravi is handling CLM-005. |
+| **Awaiting documents** shows 3 claims | Open CLM-003. The family filed at 08:10 and the roof photo is still missing. |
+| **Unassigned** shows 7 claims | These families have supplied all required documents. Their claims are waiting for an adjuster. |
 
-Run the original tests and add tests for priority ties, document arrival, stale or competing assignments, capacity and replay. Demonstrate one test that would catch a plausible dispatch mistake and explain one design decision you made with Bob.
+## What is missing today?
 
-## Find your way around
+Select **Unassigned**. The first row is CLM-001, a Standard claim for water damage to a floor. Farther down are two High claims, CLM-008 and CLM-009. Divya can inspect all three, but the register leaves her to work out which family should get the next available slot. Once she decides, there’s no action to record the assignment. If a photo arrives or an adjuster becomes unavailable, she has to revise her spreadsheet again.
 
-| Path | Purpose |
+Extend this dashboard. Keep the existing register, status filter and clickable claim details working.
+
+## 1. Show Divya which claim comes next
+
+Build a **Ready** queue for claims with no assigned adjuster and every required document received. Show incomplete, unassigned claims under **Waiting for documents** and list each missing item. A claim with an assigned adjuster stays with that person.
+
+Order Ready claims by severity (**High**, **Standard**, **Low**), then by original filing time (oldest first), then by claim ID (ascending). Display the severity and filing time beside the ID so Divya can explain her decision.
+
+On the original desk, **CLM-008** should lead. CLM-009 has the same severity and 09:00 filing time, so the smaller ID decides. CLM-003 is older than both and stays in Waiting until its roof photo arrives.
+
+## 2. Assign a claim to an adjuster
+
+Let Divya select a Ready claim and an available adjuster with room. Each adjuster can handle **two active claims**, counting the ones they already have. After a successful assignment, remove the claim from Ready, show its assigned adjuster in the details, and update that adjuster’s workload.
+
+Two browser tabs share one desk. When an assignment arrives, the **server** must check the claim’s documents, current assignment, adjuster availability and remaining capacity. If the desk has changed, decline the request, explain why and bring the tab up to date. If two requests compete for the last slot, exactly one succeeds and the other claim stays ready.
+
+## 3. Handle the mid-morning update
+
+Add a **Load storm update** action that applies the two events in the supplied [storm update file](fixtures/storm-update.json).
+
+| Time | What happens | What Divya should see |
+| --- | --- | --- |
+| 10:30 | The JP Nagar family sends the missing roof photo for CLM-003. | The claim moves into Ready with its original 08:10 filing time. On the starting desk it moves ahead of CLM-008. |
+| 10:35 | Meera calls from a site visit. She can finish the claim she’s handling and cannot take another. | Meera becomes unavailable for new assignments. CLM-006 still lists Meera as its assigned adjuster and shows **Owner unavailable**. Other existing assignments stay intact. |
+
+Keep accepted changes when Divya refreshes the page. Replaying the file should leave the same queue, photo list, workloads and assignments. Keeping state in a single running server process is sufficient for the workshop.
+
+## What to demonstrate
+
+1. Open the original desk in two tabs. Show seven Ready claims, explain why CLM-008 precedes CLM-009, and find both missing documents for CLM-002 in Waiting.
+2. Load the storm update in the first tab **before making any new assignment**. Show eight Ready claims with CLM-003 first. Open CLM-006 and show who is still handling it.
+3. From the older tab, try to assign CLM-008 to Meera. Show the rejection and the updated desk. Then assign CLM-003 to Ravi. His workload should reach two, and CLM-008 should return to the top.
+4. Refresh and replay the update. Show **seven ready, two waiting and three assigned**. CLM-003 has one roof photo and stays with Ravi. CLM-006 stays with Meera.
+5. Run the original and new tests. Cover priority ties, missing documents, assignment checks, two requests for one slot, the storm update and replay. Walk through one test and one decision your team made with Bob.
+
+## Where to look
+
+| File | What you’ll find |
 | --- | --- |
-| `data/desk.json` | Fictional claims, required and received documents, owners and adjusters |
-| `server.mjs` | Local HTTP server and read-only starting API |
-| `public/claims.js` | Existing document, status and filter logic |
-| `public/app.js` | Register, roster, selection and details |
-| `public/index.html`, `public/styles.css` | Dashboard layout and styling |
-| `fixtures/storm-update.json` | The two events to apply and replay |
-| `test/desk.test.js` | Baseline regression tests |
+| `data/desk.json` | Starting claims, documents, adjusters and workloads inferred from assignments |
+| `public/claims.js` | Existing rules for missing documents, status and filtering |
+| `public/app.js` | The roster, selectable claim rows and details panel |
+| `public/index.html` and `public/styles.css` | The dashboard layout and styles |
+| `server.mjs` | The local server and its read-only starting API |
+| `fixtures/storm-update.json` | The document arrival and Meera’s availability change |
+| `test/desk.test.js` | The five baseline tests |
 
 ## Optional IBM Bob prompts
 
-Paste one prompt at a time. All business rules and acceptance checks are above.
+If you’re new to Bob, paste **one prompt at a time** into the same conversation. Check the result in the app or tests before moving on.
 
-1. **Explore.** “Run the baseline tests. Trace CLM-003 from the seed through the API to its document list. Where does the existing app calculate status? Stop before editing.”
-2. **Plan.** “Read the dispatch rules. Propose the smallest changes that let two tabs share one desk. Explain which checks belong on the server and how to test the last available slot.”
-3. **Build the queue.** “Implement Ready and Waiting for documents using the stated priority rules. Preserve claim selection and filters. Test the 09:00 tie and a claim missing two documents.”
-4. **Add assignment.** “Implement assignment through the UI and server. Recheck every rule at write time. Test two requests competing for one slot, and show what Divya sees when an assignment is declined.”
-5. **Handle the update.** “Apply the supplied storm events, refresh the queue and preserve owners. Test repeated delivery, the stale tab, and a refresh. Walk through the acceptance table and report any gaps.”
+**1. Understand Divya’s desk**
+
+```text
+Read this README and run the baseline tests. Trace CLM-003 from data/desk.json to its document list on screen. Explain what “1 of 2 active claims” means for Meera and show me where the existing app decides a claim’s status. Stop before editing.
+```
+
+**2. Plan the change**
+
+```text
+Plan the three features in this README using the existing dashboard. Identify what we can reuse, where shared desk state will live, and which checks must happen when the server receives an assignment. Give me a short implementation and test plan to review.
+```
+
+**3. Build and check the queue**
+
+```text
+Implement part 1. Preserve claim selection, details and filters. Add tests for missing documents, severity, original filing time and the 09:00 tie. Run the tests and tell me where to look in the UI to verify why CLM-008 leads and CLM-003 waits.
+```
+
+**4. Add assignment and capacity checks**
+
+```text
+Implement part 2 from the dashboard through the server. Test a successful assignment and rejected requests for an incomplete claim, an already assigned claim, an unavailable adjuster and a full adjuster. Send two competing requests for Ravi’s last slot and verify only one succeeds. Run the tests and show me how to inspect the resulting workload.
+```
+
+**5. Apply the storm update**
+
+```text
+Read the supplied events and implement part 3. Test CLM-003 moving into Ready at its original filing time and Meera keeping CLM-006 when she becomes unavailable. Cover a request from an older tab and replay after assigning CLM-003 to Ravi. Run the tests and explain how I can verify the result after refreshing.
+```
+
+**6. Rehearse the demonstration**
+
+```text
+Review our changes against “What to demonstrate”. Run the full test suite. Identify and fix any missed requirement, then give me a short two-tab demo checklist starting from the original twelve claims. Ask me to explain why CLM-003 moved and why CLM-006 stayed with Meera.
+```
