@@ -41,7 +41,7 @@ function showDesk({ claims, adjusters }) {
     }
     const owner = adjusters.find(a => a.id === selected.owner);
     details.append(el('p', selected.id, 'overline'), el('h2', selected.summary), el('p', selected.area),
-      el('h3', 'Claim owner'), el('p', owner?.name ?? 'Unassigned'), el('h3', 'Required documents'));
+      el('h3', 'Assigned adjuster'), el('p', owner?.name ?? 'Unassigned'), el('h3', 'Required documents'));
     const docs = el('ul');
     for (const name of selected.requiredDocuments) {
       const item = el('li', name);
